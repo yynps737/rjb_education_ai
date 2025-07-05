@@ -2,35 +2,69 @@ name: Sync to Gitee
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    name: Sync to Gitee
     steps:
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.GITEE_PRIVATE_KEY }}" > ~/.ssh/gitee_key
-          chmod 600 ~/.ssh/gitee_key
-          ssh-keyscan gitee.com >> ~/.ssh/known_hosts
-          
-      - name: Sync to Gitee
-        uses: wearerequired/git-mirror-action@v1
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          source-repo: "git@github.com:yynps737/rjb_education_ai.git"
-          destination-repo: "git@gitee.com:${{ secrets.GITEE_USERNAME }}/rjb_education_ai.git"
+          fetch-depth: 0
 
-      # 备选方案：使用 Yikun/hub-mirror-action
-      # - name: Mirror to Gitee
-      #   uses: Yikun/hub-mirror-action@master
-      #   with:
-      #     src: github/yynps737
-      #     dst: gitee/${{ secrets.GITEE_USERNAME }}
-      #     dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
-      #     dst_token: ${{ secrets.GITEE_TOKEN }}
-      #     static_list: "rjb_education_ai"
-      #     force_update: true
+      - name: Debug - Check Secrets
+        run: |
+          echo "Checking if secrets are set..."
+          if [ -z "${{ secrets.GITEE_USERNAME }}" ]; then
+            echo "ERROR: GITEE_USERNAME is not set"
+            exit 1
+          fi
+          echo "GITEE_USERNAME is set"
+          
+          if [ -z "${{ secrets.GITEE_PRIVATE_KEY }}" ]; then
+            echo "ERROR: GITEE_PRIVATE_KEY is not set"
+            exit 1
+          fi
+          echo "GITEE_PRIVATE_KEY is set"
+
+      - name: Setup SSH with Debug
+        env:
+          GITEE_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+        run: |
+          echo "Setting up SSH..."
+          mkdir -p ~/.ssh/
+          
+          # 保存密钥
+          echo "$GITEE_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          
+          # 检查密钥文件
+          echo "Checking key file..."
+          ls -la ~/.ssh/id_ed25519
+          
+          # 设置权限
+          chmod 600 ~/.ssh/id_ed25519
+          
+          # 添加 known hosts
+          ssh-keyscan -t ed25519,rsa gitee.com >> ~/.ssh/known_hosts 2>/dev/null
+          
+          # 测试 SSH 连接
+          echo "Testing SSH connection..."
+          ssh -vT git@gitee.com 2>&1 || true
+
+      - name: Sync to Gitee
+        env:
+          GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
+        run: |
+          echo "Adding Gitee remote..."
+          git remote add gitee git@gitee.com:${GITEE_USERNAME}/rjb_education_ai.git || echo "Remote already exists"
+          
+          echo "Current remotes:"
+          git remote -v
+          
+          echo "Pushing to Gitee..."
+          git push -f gitee main:main --tags || exit 1
+          
+          echo "Sync completed successfully!"
