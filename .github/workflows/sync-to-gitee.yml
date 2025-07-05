@@ -1,0 +1,29 @@
+name: Sync to Gitee
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync to Gitee
+        uses: wearerequired/git-mirror-action@v1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+        with:
+          source-repo: "git@github.com:yynps737/rjb_education_ai.git"
+          destination-repo: "git@gitee.com:${{ secrets.GITEE_USERNAME }}/rjb_education_ai.git"
+
+      # 备选方案：使用 Yikun/hub-mirror-action
+      # - name: Mirror to Gitee
+      #   uses: Yikun/hub-mirror-action@master
+      #   with:
+      #     src: github/yynps737
+      #     dst: gitee/${{ secrets.GITEE_USERNAME }}
+      #     dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+      #     dst_token: ${{ secrets.GITEE_TOKEN }}
+      #     static_list: "rjb_education_ai"
+      #     force_update: true
