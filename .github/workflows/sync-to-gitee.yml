@@ -9,6 +9,13 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITEE_PRIVATE_KEY }}" > ~/.ssh/gitee_key
+          chmod 600 ~/.ssh/gitee_key
+          ssh-keyscan gitee.com >> ~/.ssh/known_hosts
+          
       - name: Sync to Gitee
         uses: wearerequired/git-mirror-action@v1
         env:
