@@ -43,7 +43,7 @@ class CourseResponse(BaseModel):
     assignment_count: int
     created_at: str
 
-@router.get("/")
+@router.get("")
 async def get_all_courses(
     subject: Optional[str] = None,
     teacher_id: Optional[int] = None,
@@ -97,7 +97,7 @@ async def get_all_courses(
         }
     })
 
-@router.post("/", response_model=CourseResponse)
+@router.post("", response_model=CourseResponse)
 async def create_course(
     course_data: CourseCreateRequest,
     current_user: User = Depends(require_role([UserRole.ADMIN])),

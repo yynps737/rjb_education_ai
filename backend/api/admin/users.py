@@ -37,7 +37,7 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 async def get_users(
     role: Optional[UserRole] = None,
     search: Optional[str] = None,
@@ -79,7 +79,7 @@ async def get_users(
 
     return response_users
 
-@router.post("/", response_model=UserResponse)
+@router.post("", response_model=UserResponse)
 async def create_user(
     user_data: UserCreateRequest,
     current_user: User = Depends(require_role([UserRole.ADMIN])),

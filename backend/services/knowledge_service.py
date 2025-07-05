@@ -208,5 +208,48 @@ class KnowledgeService:
         """获取索引统计信息"""
         return self.vector_store.get_collection_stats()
 
+    async def ask_question(self, question: str, course_id: Optional[int] = None) -> Dict[str, Any]:
+        """基于知识库回答问题"""
+        try:
+            # 搜索相关内容
+            search_results = await self.search_knowledge(
+                query=question,
+                course_id=course_id,
+                limit=3
+            )
+            
+            if not search_results:
+                return {
+                    "answer": "抱歉，我无法在知识库中找到相关信息来回答您的问题。",
+                    "sources": [],
+                    "confidence": 0.0
+                }
+            
+            # 构建上下文
+            context = "\n\n".join([result["content"] for result in search_results[:3]])
+            
+            # 简单的回答生成（实际应用中应该使用LLM）
+            answer = f"根据知识库中的信息：\n\n{context}\n\n这是关于您问题的相关内容。"
+            
+            return {
+                "answer": answer,
+                "sources": [
+                    {
+                        "content": result["content"][:200] + "...",
+                        "metadata": result["metadata"],
+                        "relevance_score": result["relevance_score"]
+                    }
+                    for result in search_results[:3]
+                ],
+                "confidence": max([r["relevance_score"] for r in search_results[:3]]) if search_results else 0.0
+            }
+        except Exception as e:
+            logger.error(f"处理问题时出错: {str(e)}")
+            return {
+                "answer": f"处理您的问题时出现错误：{str(e)}",
+                "sources": [],
+                "confidence": 0.0
+            }
+
 # 创建单例实例
 knowledge_service = KnowledgeService()

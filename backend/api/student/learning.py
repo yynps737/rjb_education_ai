@@ -238,18 +238,19 @@ async def ask_question(
             course_id=request.course_id
         )
 
-        # Log the question for analytics
-        analytics_service.record_performance_metric(
-            db,
-            user_id=current_user.id,
-            course_id=request.course_id or 0,
-            metric_type="question_asked",
-            value=1,
-            metadata={
-                "question": request.question[:200]
-                # 前200 chars
-            }
-        )
+        # Log the question for analytics (only if course_id is provided)
+        if request.course_id:
+            analytics_service.record_performance_metric(
+                db,
+                user_id=current_user.id,
+                course_id=request.course_id,
+                metric_type="question_asked",
+                value=1,
+                metadata={
+                    "question": request.question[:200]
+                    # 前200 chars
+                }
+            )
 
         return success_response(data={
             "question": request.question,

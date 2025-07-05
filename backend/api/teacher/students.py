@@ -16,7 +16,7 @@ from services.analytics_service import analytics_service
 router = APIRouter(tags=["Teacher - Students"])
 
 
-@router.get("/")
+@router.get("")
 async def get_teacher_students(
     course_id: Optional[int] = None,
     current_user: User = Depends(require_role([UserRole.TEACHER])),

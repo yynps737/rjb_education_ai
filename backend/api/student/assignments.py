@@ -38,7 +38,7 @@ class AnswerSubmission(BaseModel):
 class SubmissionRequest(BaseModel):
     answers: List[AnswerSubmission]
 
-@router.get("/", response_model=List[AssignmentListResponse])
+@router.get("", response_model=List[AssignmentListResponse])
 async def get_assignments(
     course_id: Optional[int] = None,
     status: Optional[str] = Query(None, enum=["pending", "submitted", "graded"]),
@@ -215,7 +215,7 @@ async def get_submission_details(
 
     return success_response(data=details)
 
-@router.get("/upcoming")
+@router.get("/upcoming", response_model=List[AssignmentListResponse])
 async def get_upcoming_assignments(
     days: int = Query(7, ge=1, le=30),
     current_user: User = Depends(require_role([UserRole.STUDENT])),

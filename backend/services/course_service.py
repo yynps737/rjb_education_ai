@@ -1,6 +1,7 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException
+from utils.error_handler import AppError, not_found
 
 from services.base import BaseService
 from models.course import Course, Chapter, Lesson
@@ -60,7 +61,7 @@ class CourseService(BaseService[Course]):
         """Enroll a student in a course"""
         course = self.get(db, course_id)
         if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
+            raise not_found("课程")
 
         student = db.query(User).filter(
             User.id == student_id,
@@ -68,12 +69,14 @@ class CourseService(BaseService[Course]):
         ).first()
 
         if not student:
-            raise HTTPException(status_code=404, detail="Student not found")
+            raise not_found("学生")
 
-        if student not in course.users:
-            course.users.append(student)
-            db.commit()
-            db.refresh(course)
+        if student in course.users:
+            raise AppError("ALREADY_ENROLLED")
+            
+        course.users.append(student)
+        db.commit()
+        db.refresh(course)
 
         return course
 
@@ -81,7 +84,7 @@ class CourseService(BaseService[Course]):
         """Unenroll a student from a course"""
         course = self.get(db, course_id)
         if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
+            raise not_found("课程")
 
         student = db.query(User).filter(User.id == student_id).first()
         if student and student in course.users:
@@ -102,7 +105,7 @@ class CourseService(BaseService[Course]):
         """Add a chapter to a course"""
         course = self.get(db, course_id)
         if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
+            raise not_found("课程")
 
         if order is None:
             # 获取 the 下一个 order number

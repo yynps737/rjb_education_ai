@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError
+from utils.error_handler import AppError, auth_error, validation_error
 
 from models.database import get_db
 from models.user import User, UserRole
@@ -95,7 +96,7 @@ class UserResponse(BaseModel):
                     "example": {
                         "success": False,
                         "code": 401,
-                        "message": "用户名或密码错误"
+                        "message": "无效的凭据"
                     }
                 }
             }
@@ -115,10 +116,10 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user = db.query(User).filter(User.username == login_data.username).first()
 
     if not user or not verify_password(login_data.password, user.hashed_password):
-        return StandardResponse.unauthorized("用户名或密码错误", request)
+        raise AppError("INVALID_CREDENTIALS", status_code=401)
 
     if not user.is_active:
-        return StandardResponse.forbidden("账户未激活", request)
+        raise AppError("USER_INACTIVE", status_code=403, detail="账户已被禁用")
 
     # 更新最后登录时间
     user.last_login = datetime.utcnow()
@@ -236,11 +237,11 @@ async def student_register(register_data: RegisterRequest, db: Session = Depends
     """
     # 检查用户名是否存在
     if db.query(User).filter(User.username == register_data.username).first():
-        raise HTTPException(status_code=400, detail="用户名已被注册")
+        raise AppError("USER_EXISTS")
 
     # 检查邮箱是否存在
     if db.query(User).filter(User.email == register_data.email).first():
-        raise HTTPException(status_code=400, detail="邮箱已被注册")
+        raise AppError("EMAIL_EXISTS")
 
     # 创建新用户
     user = User(
@@ -263,7 +264,7 @@ async def student_register(register_data: RegisterRequest, db: Session = Depends
 async def get_student_info(current_user: User = Depends(get_current_user)):
     """获取当前学生信息"""
     if current_user.role != UserRole.STUDENT:
-        raise HTTPException(status_code=403, detail="访问被拒绝")
+        raise AppError("PERMISSION_DENIED", status_code=403)
 
     return current_user
 

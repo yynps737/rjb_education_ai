@@ -111,36 +111,62 @@ async def generate_course_outline(request: CourseOutlineRequest):
 
 请以JSON格式输出。"""
 
-        response = llm.generate(prompt=prompt)
+        # 添加JSON格式要求
+        prompt += """
 
-        # 解析响应
-        import json
-        import re
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-        if json_match:
-            outline_data = json.loads(json_match.group())
+请严格按照以下JSON格式输出：
+{
+    "sections": [
+        {
+            "name": "章节名称",
+            "duration": 时间（分钟）,
+            "content": "具体内容",
+            "activities": "学生活动",
+            "method": "教学方法"
+        }
+    ],
+    "teaching_methods": ["方法1", "方法2"],
+    "required_materials": ["材料1", "材料2"]
+}"""
 
-            return CourseOutlineResponse(
-                course_name=request.course_name,
-                duration_minutes=request.duration_minutes,
-                sections=outline_data.get("sections", []),
-                teaching_methods=outline_data.get("teaching_methods", []),
-                required_materials=outline_data.get("required_materials", [])
-            )
-        else:
-            # 如果解析失败，返回基础结构
-            return CourseOutlineResponse(
-                course_name=request.course_name,
-                duration_minutes=request.duration_minutes,
-                sections=[
-                    {"name": "课程导入", "duration": 5, "content": "介绍本节课主题"},
-                    {"name": "知识讲解", "duration": 25, "content": knowledge_str},
-                    {"name": "实践练习", "duration": 10, "content": "学生练习"},
-                    {"name": "课堂总结", "duration": 5, "content": "回顾要点"}
-                ],
-                teaching_methods=["讲授法", "讨论法", "练习法"],
-                required_materials=["PPT", "练习题"]
-            )
+        try:
+            response = llm.generate(prompt=prompt)
+            
+            # 解析响应
+            import json
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                outline_data = json.loads(json_match.group())
+                
+                # 确保sections存在且格式正确
+                sections = outline_data.get("sections", [])
+                if not sections:
+                    raise ValueError("No sections in response")
+                
+                return CourseOutlineResponse(
+                    course_name=request.course_name,
+                    duration_minutes=request.duration_minutes,
+                    sections=sections,
+                    teaching_methods=outline_data.get("teaching_methods", ["讲授法", "讨论法", "练习法"]),
+                    required_materials=outline_data.get("required_materials", ["PPT", "练习题"])
+                )
+        except Exception as e:
+            logger.warning(f"解析LLM响应失败: {e}")
+        
+        # 如果解析失败，返回基础结构
+        return CourseOutlineResponse(
+            course_name=request.course_name,
+            duration_minutes=request.duration_minutes,
+            sections=[
+                {"name": "课程导入", "duration": 5, "content": "介绍本节课主题", "activities": "学生聆听", "method": "讲授法"},
+                {"name": "知识讲解", "duration": 25, "content": knowledge_str, "activities": "记笔记、提问", "method": "讲授法+讨论法"},
+                {"name": "实践练习", "duration": 10, "content": "学生练习相关题目", "activities": "动手练习", "method": "练习法"},
+                {"name": "课堂总结", "duration": 5, "content": "回顾要点", "activities": "总结反思", "method": "讲授法"}
+            ],
+            teaching_methods=["讲授法", "讨论法", "练习法"],
+            required_materials=["PPT", "练习题", "教材"]
+        )
 
     except Exception as e:
         logger.error(f"Error generating course outline: {e}")

@@ -125,6 +125,17 @@ python main.py
 - API文档：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/health
 
+### 5. 运行测试
+```bash
+# 创建测试数据
+cd backend
+python scripts/seed_data.py
+
+# 运行API测试
+cd ..
+./test_all_apis.sh
+```
+
 ## 📚 API使用示例
 
 ### 登录

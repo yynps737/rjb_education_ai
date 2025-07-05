@@ -148,7 +148,7 @@ cython_debug/
 Thumbs.db
 
 # Project specific
-data/
+backend/data/chroma/
 logs/
 uploads/
 *.db
@@ -156,6 +156,7 @@ uploads/
 *.sqlite3
 server.log
 nohup.out
+test_output/
 
 # Temporary files
 tmp/

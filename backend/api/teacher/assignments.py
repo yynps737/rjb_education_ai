@@ -36,7 +36,7 @@ class AssignmentUpdateRequest(BaseModel):
     status: Optional[AssignmentStatus] = None
 
 
-@router.get("/")
+@router.get("")
 async def get_teacher_assignments(
     course_id: Optional[int] = None,
     status: Optional[AssignmentStatus] = None,
@@ -75,7 +75,7 @@ async def get_teacher_assignments(
     }
 
 
-@router.post("/")
+@router.post("")
 async def create_assignment(
     request: AssignmentCreateRequest,
     current_user: User = Depends(require_role([UserRole.TEACHER])),

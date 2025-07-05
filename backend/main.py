@@ -4,7 +4,7 @@
 import os
 import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -67,6 +67,47 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 导入错误处理
+from utils.error_handler import AppError, create_error_response
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+# 全局异常处理器
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError):
+    """处理应用自定义错误"""
+    return create_error_response(
+        error_code=exc.error_code,
+        status_code=exc.status_code,
+        detail=exc.detail.get("message") if isinstance(exc.detail, dict) else None,
+        request=request
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """处理请求验证错误"""
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        errors.append(f"{field}: {error['msg']}")
+    
+    return create_error_response(
+        error_code="INVALID_INPUT",
+        status_code=422,
+        detail="; ".join(errors),
+        request=request
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """处理HTTP异常"""
+    return create_error_response(
+        error_code="HTTP_ERROR",
+        status_code=exc.status_code,
+        detail=exc.detail,
+        request=request
+    )
 
 # 配置信任的主机
 app.add_middleware(
