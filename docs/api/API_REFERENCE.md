@@ -1,10 +1,14 @@
-# API接口文档 (API Reference)
+# AI Education Assistant Platform - API Reference
+
+**作者**: Kisir  
+**邮箱**: kikiboy1120@gmail.com  
+**更新日期**: 2025-01-06
 
 ## 1. 概述
 
 ### 1.1 基础信息
-- **基础URL**: `https://api.education-ai.com/v1`
-- **协议**: HTTPS
+- **基础URL**: `http://localhost:8000` (开发环境)
+- **协议**: HTTP/HTTPS
 - **数据格式**: JSON
 - **字符编码**: UTF-8
 - **API版本**: v1.0.0
@@ -168,14 +172,13 @@ Authorization: Bearer <access_token>
 **GET** `/api/student/learning/progress`
 
 #### 3.3.2 智能问答
-**POST** `/api/knowledge/ask`
+**POST** `/api/student/learning/ask`
 
 ##### 请求体
 ```json
 {
-  "query": "什么是递归函数？",
-  "context_type": "course",
-  "course_id": 1
+  "question": "什么是递归函数？",
+  "course_id": 1  // 可选
 }
 ```
 
@@ -184,21 +187,42 @@ Authorization: Bearer <access_token>
 {
   "success": true,
   "data": {
-    "question": "什么是递归函数？",
     "answer": "递归函数是指在函数定义中调用自身的函数...",
     "sources": [
       {
-        "id": "doc_123",
-        "title": "Python函数进阶",
-        "relevance": 0.95
+        "content": "Python函数进阶...",
+        "metadata": {
+          "title": "Python函数进阶",
+          "document_id": 123
+        },
+        "relevance_score": 0.95
       }
     ],
-    "related_questions": [
-      "递归函数的优缺点是什么？",
-      "如何避免递归栈溢出？"
-    ]
+    "confidence": 0.95
   }
 }
+```
+
+#### 3.3.3 流式AI问答
+**POST** `/api/student/learning/ask-stream`
+
+##### 请求体
+```json
+{
+  "question": "解释一下Python中的装饰器",
+  "course_id": null
+}
+```
+
+##### 响应格式 (Server-Sent Events)
+```
+data: {"type": "metadata", "sources": [{"content": "...", "metadata": {...}}]}
+
+data: {"type": "content", "content": "装饰器是Python中"}
+
+data: {"type": "content", "content": "一个强大的特性..."}
+
+data: {"type": "done"}
 ```
 
 ## 4. 教师端接口
@@ -339,15 +363,55 @@ Authorization: Bearer <access_token>
 #### 5.3.1 平台概览
 **GET** `/api/admin/analytics/overview`
 
-## 6. 公共接口
+## 6. 知识库接口
 
-### 6.1 文件上传
-**POST** `/api/upload`
+### 6.1 上传知识文档
+**POST** `/api/knowledge/upload`
 
 #### 请求格式
 - Content-Type: `multipart/form-data`
 - 最大文件大小: 10MB
-- 支持格式: PDF, DOCX, PPTX, TXT, MD, JPG, PNG
+- 支持格式: PDF, DOCX, PPTX, TXT, MD, JSON
+
+#### 请求参数
+```
+file: 文件对象
+course_id: 课程ID (可选)
+description: 文档描述 (可选)
+```
+
+### 6.2 批量删除知识文档
+**POST** `/api/knowledge/batch-delete`
+
+#### 请求体
+```json
+{
+  "ids": [1, 2, 3, 4, 5]
+}
+```
+
+#### 响应示例
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": 5,
+    "failed": 0,
+    "details": []
+  }
+}
+```
+
+### 6.3 知识库问答
+**POST** `/api/knowledge/ask`
+
+#### 请求体
+```json
+{
+  "query": "什么是机器学习？",
+  "course_id": 1  // 可选
+}
+```
 
 #### 响应示例
 ```json
@@ -363,19 +427,18 @@ Authorization: Bearer <access_token>
 }
 ```
 
-## 7. WebSocket接口
+## 7. 流式接口 (Server-Sent Events)
 
-### 7.1 实时答疑
-**WebSocket** `/ws/chat/{course_id}`
+### 7.1 流式AI对话
+**SSE** `/api/student/learning/ask-stream`
 
-#### 消息格式
-```json
-{
-  "type": "message",
-  "content": "老师，这道题怎么做？",
-  "attachments": []
-}
-```
+#### 消息类型
+| 类型 | 描述 | 数据格式 |
+|------|------|--------|
+| metadata | 元数据信息 | `{"sources": [...]}` |
+| content | 内容片段 | `{"content": "..."}` |
+| done | 完成标识 | `{}` |
+| error | 错误信息 | `{"error": "..."}` |
 
 ## 8. 速率限制
 
@@ -445,14 +508,45 @@ async function getCourses() {
 }
 ```
 
-## 10. 更新日志
+## 10. 最新功能更新
 
-### v1.0.0 (2024-07-05)
+### v1.1.0 (2025-01-06)
+- **流式AI对话**: 实现类ChatGPT的实时流式输出
+- **批量操作**: 支持知识库文档批量删除
+- **权限优化**: 精确控制用户对资源的操作权限
+- **智能引用**: AI回答只显示实际使用的参考源
+
+### v1.0.0 (2024-12-01)
 - 初始版本发布
 - 基础认证功能
 - 学生、教师、管理员核心功能
-- AI集成功能
+- AI集成功能 (阿里云千问)
+- 知识库RAG系统
+
+## 11. 错误处理最佳实践
+
+### 11.1 流式调用失败处理
+```javascript
+// 前端代码示例
+try {
+  // 尝试流式调用
+  for await (const data of streamAskQuestion(question)) {
+    // 处理流式数据
+  }
+} catch (streamError) {
+  // 降级到普通API
+  const response = await api.post('/api/student/learning/ask', {
+    question: question
+  })
+}
+```
+
+### 11.2 权限错误处理
+- 401: Token过期或无效，需要重新登录
+- 403: 没有权限访问该资源
+- 404: 资源不存在或已被删除
 
 ---
 
-*完整的API文档请访问: https://api.education-ai.com/docs*
+**文档维护**: 本文档由 Kisir (kikiboy1120@gmail.com) 维护  
+**在线API文档**: http://localhost:8000/docs (FastAPI自动生成)

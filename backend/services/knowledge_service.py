@@ -8,7 +8,7 @@ from datetime import datetime
 
 from models.course import Course, Chapter, Lesson
 from models.knowledge import KnowledgeDocument
-from core.vector_db.optimized_chroma_store import OptimizedChromaStore
+from core.vector_db.simple_chroma_store import SimpleChromaStore
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class KnowledgeService:
         else:
             dashscope_key = os.getenv("DASHSCOPE_API_KEY")
 
-        self.vector_store = OptimizedChromaStore(
+        self.vector_store = SimpleChromaStore(
             collection_name="course_knowledge",
             api_key=dashscope_key
         )
@@ -206,7 +206,16 @@ class KnowledgeService:
 
     def get_index_stats(self) -> Dict[str, Any]:
         """获取索引统计信息"""
-        return self.vector_store.get_collection_stats()
+        # 获取基本统计信息
+        collection_stats = self.vector_store.get_collection_stats()
+        
+        # 转换为前端期望的格式
+        return {
+            "total_items": collection_stats.get("count", 0),
+            "total_views": 0,  # 暂时硬编码，后续可以从数据库统计
+            "starred_items": 0,  # 暂时硬编码，后续可以从数据库统计
+            "recent_items": 0  # 暂时硬编码，后续可以从数据库统计
+        }
 
     async def ask_question(self, question: str, course_id: Optional[int] = None) -> Dict[str, Any]:
         """基于知识库回答问题"""

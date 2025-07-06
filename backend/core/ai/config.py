@@ -26,6 +26,18 @@ class AIConfig:
         self.max_tokens = 4096
         self.temperature = 0.7
         self.enable_monitoring = True
+        
+        # 文档处理配置
+        self.doc_supported_formats = {
+            '.txt', '.md', '.pdf', '.docx', '.doc', 
+            '.pptx', '.xlsx', '.xls', '.csv', '.json', 
+            '.html', '.xml'
+        }
+        self.doc_max_file_size = 50 * 1024 * 1024  # 50MB
+        self.doc_extract_images = False  # 暂时禁用图片提取
+        self.doc_ocr_enabled = False  # 暂时禁用OCR
+        self.rag_chunk_size = 1000
+        self.rag_chunk_overlap = 200
 
     def get_llm_config(self):
         """获取LLM配置"""

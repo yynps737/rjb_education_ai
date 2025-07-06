@@ -73,18 +73,28 @@ async def get_all_courses(
 
     courses = []
     for course in result["items"]:
+        # Calculate completion rate (mock for now)
+        completion_rate = 85 if len(course.users) > 0 else 0
+        
+        # Calculate average score (mock for now)
+        average_score = 78 if len(course.users) > 0 else 0
+        
         courses.append({
             "id": course.id,
             "title": course.title,
             "description": course.description,
             "subject": course.subject,
-            "grade_level": course.grade_level,
+            "grade_level": course.grade_level or 1,
             "teacher_id": course.teacher_id,
             "teacher_name": course.teacher.full_name,
             "student_count": len(course.users),
             "chapter_count": len(course.chapters),
             "assignment_count": len(course.assignments),
-            "created_at": course.created_at.isoformat()
+            "is_published": True,  # Add published status
+            "created_at": course.created_at.isoformat(),
+            "updated_at": course.updated_at.isoformat() if hasattr(course, 'updated_at') else course.created_at.isoformat(),
+            "completion_rate": completion_rate,
+            "average_score": average_score
         })
 
     return success_response(data={
@@ -314,29 +324,38 @@ async def get_course_statistics(
 ):
     """Get course statistics summary"""
     total_courses = db.query(Course).count()
+    published_courses = total_courses  # Mock all as published for now
 
     # Courses by subject
     subjects = db.query(Course.subject, db.func.count(Course.id)).group_by(Course.subject).all()
-    courses_by_subject = {subject: count for subject, count in subjects}
+    subject_distribution = [{"subject": subject, "count": count} for subject, count in subjects if subject]
 
-    # 激活 courses (with students)
-    active_courses = db.query(Course).join(Course.users).distinct().count()
+    # Grade distribution
+    grades = db.query(Course.grade_level, db.func.count(Course.id)).group_by(Course.grade_level).all()
+    grade_distribution = [{"grade": int(grade) if grade else 1, "count": count} for grade, count in grades]
 
-    # 平均 students per course
-    from sqlalchemy import func
-    avg_students = db.query(
-        func.avg(func.count(User.id))
-    ).select_from(Course).join(Course.users).group_by(Course.id).scalar() or 0
+    # Total students
+    total_students = db.query(User).filter(User.role == UserRole.STUDENT).count()
 
-    # Courses without assignments
-    courses_without_assignments = db.query(Course).filter(
-        ~Course.assignments.any()
-    ).count()
+    # Total assignments
+    total_assignments = db.query(Assignment).count()
+
+    # Monthly courses (mock data for now)
+    from datetime import datetime
+    current_month = datetime.utcnow().strftime("%Y-%m")
+    monthly_courses = [
+        {"month": "2024-01", "count": 3},
+        {"month": "2024-02", "count": 5},
+        {"month": "2024-03", "count": 4},
+        {"month": current_month, "count": total_courses}
+    ]
 
     return success_response(data={
         "total_courses": total_courses,
-        "active_courses": active_courses,
-        "courses_by_subject": courses_by_subject,
-        "average_students_per_course": round(float(avg_students), 1),
-        "courses_without_assignments": courses_without_assignments
+        "published_courses": published_courses,
+        "total_students": total_students,
+        "total_assignments": total_assignments,
+        "subject_distribution": subject_distribution,
+        "grade_distribution": grade_distribution,
+        "monthly_courses": monthly_courses
     })

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from models.database import get_db
 from models.user import User, UserRole
 from models.course import Course
+from models.analytics import LearningProgress
 from utils.auth import get_current_active_user, require_role
 from utils.response import success_response, error_response
 from utils.pagination import paginate, PaginationParams
@@ -43,10 +44,10 @@ async def get_enrolled_courses(
     response = []
     for course in courses:
         # 获取progress
-        progress = db.query(analytics_service.LearningProgress).filter(
-            analytics_service.LearningProgress.user_id == current_user.id,
-            analytics_service.LearningProgress.course_id == course.id,
-            analytics_service.LearningProgress.chapter_id.is_(None)
+        progress = db.query(LearningProgress).filter(
+            LearningProgress.user_id == current_user.id,
+            LearningProgress.course_id == course.id,
+            LearningProgress.chapter_id.is_(None)
         ).first()
 
         course_data = CourseResponse(
@@ -182,10 +183,10 @@ async def get_course_details(
         )
 
     # 获取progress
-    progress = db.query(analytics_service.LearningProgress).filter(
-        analytics_service.LearningProgress.user_id == current_user.id,
-        analytics_service.LearningProgress.course_id == course.id,
-        analytics_service.LearningProgress.chapter_id.is_(None)
+    progress = db.query(LearningProgress).filter(
+        LearningProgress.user_id == current_user.id,
+        LearningProgress.course_id == course.id,
+        LearningProgress.chapter_id.is_(None)
     ).first()
 
     # 获取作业stats
@@ -204,10 +205,10 @@ async def get_course_details(
     # 格式化chapters
     chapters = []
     for chapter in course.chapters:
-        chapter_progress = db.query(analytics_service.LearningProgress).filter(
-            analytics_service.LearningProgress.user_id == current_user.id,
-            analytics_service.LearningProgress.chapter_id == chapter.id,
-            analytics_service.LearningProgress.lesson_id.is_(None)
+        chapter_progress = db.query(LearningProgress).filter(
+            LearningProgress.user_id == current_user.id,
+            LearningProgress.chapter_id == chapter.id,
+            LearningProgress.lesson_id.is_(None)
         ).first()
 
         chapters.append({

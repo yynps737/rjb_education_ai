@@ -5,6 +5,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -31,6 +32,7 @@ from api.student import assignments_router, courses_router as student_courses_ro
 from api.teacher.course_design import router as teacher_router
 from api.teacher.assignments import router as teacher_assignments_router
 from api.teacher.students import router as teacher_students_router
+from api.teacher.stats import router as teacher_stats_router
 from api.knowledge import router as knowledge_router
 
 # 生命周期管理
@@ -38,6 +40,14 @@ from api.knowledge import router as knowledge_router
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     logger.info("启动教育AI助手...")
+    
+    # 确保必要的目录存在
+    try:
+        from ensure_directories import ensure_directories
+        ensure_directories()
+        logger.info("目录结构检查完成")
+    except Exception as e:
+        logger.error(f"创建目录失败: {e}")
 
     # 初始化数据库
     try:
@@ -66,7 +76,21 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 暴露所有响应头
 )
+
+# 添加中间件确保流式响应不被缓冲
+@app.middleware("http")
+async def disable_buffering(request: Request, call_next):
+    """禁用响应缓冲，特别是对于SSE端点"""
+    response = await call_next(request)
+    
+    # 如果是SSE端点，确保不缓冲
+    if request.url.path.endswith("-stream"):
+        response.headers["X-Accel-Buffering"] = "no"
+        response.headers["Cache-Control"] = "no-cache"
+        
+    return response
 
 # 导入错误处理
 from utils.error_handler import AppError, create_error_response
@@ -135,6 +159,13 @@ app.include_router(profile_router, prefix="/api/student/profile", tags=["学生-
 app.include_router(teacher_router, prefix="/api/teacher/course", tags=["教师-课程设计"])
 app.include_router(teacher_assignments_router, prefix="/api/teacher/assignments", tags=["教师-作业"])
 app.include_router(teacher_students_router, prefix="/api/teacher/students", tags=["教师-学生"])
+app.include_router(teacher_stats_router, prefix="/api", tags=["教师-统计"])
+
+# 挂载静态文件目录
+from pathlib import Path
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # 根路由
 @app.get("/")

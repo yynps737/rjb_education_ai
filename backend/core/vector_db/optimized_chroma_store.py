@@ -23,13 +23,9 @@ class OptimizedChromaStore:
         persist_directory = Path("data/chroma")
         persist_directory.mkdir(parents=True, exist_ok=True)
 
-        # 初始化Chroma客户端
+        # 初始化Chroma客户端 (ChromaDB 0.5.x API)
         self.client = chromadb.PersistentClient(
-            path=str(persist_directory),
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True
-            )
+            path=str(persist_directory)
         )
 
         # 初始化通义千问嵌入服务
@@ -45,22 +41,21 @@ class OptimizedChromaStore:
     def _init_collection(self):
         """初始化集合"""
         try:
-            # 删除旧集合（如果存在）
+            # 尝试获取现有集合
             try:
-                self.client.delete_collection(name=self.collection_name)
+                self.collection = self.client.get_collection(name=self.collection_name)
+                logger.info(f"获取现有集合: {self.collection_name}，当前文档数: {self.collection.count()}")
             except:
-                pass
-
-            # 创建新集合，指定嵌入维度
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={
-                    "description": "教育平台知识库",
-                    "embedding_model": "dashscope-text-embedding-v3",
-                    "dimension": 1536
-                }
-            )
-            logger.info(f"创建新集合: {self.collection_name}")
+                # 如果集合不存在，创建新集合
+                self.collection = self.client.create_collection(
+                    name=self.collection_name,
+                    metadata={
+                        "description": "教育平台知识库",
+                        "embedding_model": "dashscope-text-embedding-v3",
+                        "dimension": 1536
+                    }
+                )
+                logger.info(f"创建新集合: {self.collection_name}")
         except Exception as e:
             logger.error(f"集合初始化失败: {e}")
             raise

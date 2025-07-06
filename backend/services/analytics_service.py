@@ -258,7 +258,7 @@ class AnalyticsService:
             for p in recent_progress:
                 activity = {
                     "type": "learning",
-                    "timestamp": p.last_accessed,
+                    "timestamp": p.last_accessed.isoformat() if p.last_accessed else None,
                     "description": f"Studied {'lesson' if p.lesson_id else 'chapter' if p.chapter_id else 'course'}"
                 }
                 course_data["recent_activity"].append(activity)

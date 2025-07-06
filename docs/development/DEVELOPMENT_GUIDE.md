@@ -1,4 +1,8 @@
-# 开发指南 (Development Guide)
+# AI Education Assistant Platform - Development Guide
+
+**作者**: Kisir  
+**邮箱**: kikiboy1120@gmail.com  
+**更新日期**: 2025-01-06
 
 ## 1. 开发环境搭建
 
@@ -8,12 +12,14 @@
 - Git 2.20+
 - Docker & Docker Compose
 - VS Code / PyCharm (推荐IDE)
+- Redis 7+ (本地开发)
+- PostgreSQL 15+ (本地开发)
 
 ### 1.2 快速开始
 ```bash
 # 1. 克隆项目
-git clone https://github.com/yynps737/rjb_education_ai.git
-cd rjb_education_ai
+git clone https://github.com/kisir/ai-education-assistant.git
+cd ai-education-assistant
 
 # 2. 创建虚拟环境
 python -m venv backend_venv
@@ -65,6 +71,7 @@ backend/
 ├── core/              # 核心功能模块
 │   ├── ai/           # AI集成
 │   ├── llm/          # 大语言模型客户端
+│   ├── vector_db/    # 向量数据库 (ChromaDB)
 │   └── rag/          # RAG系统实现
 ├── models/            # 数据模型
 ├── services/          # 业务逻辑
@@ -312,71 +319,146 @@ if not course.is_active:
 
 ## 6. AI功能开发
 
-### 6.1 Prompt模板管理
+### 6.1 AI流式输出实现
 ```python
-class PromptTemplates:
-    """Prompt模板管理"""
-    
-    QUESTION_GENERATION = """
-    基于以下知识内容生成{num_questions}道{question_type}题目：
-    
-    知识内容：
-    {content}
-    
-    要求：
-    1. 难度等级：{difficulty}
-    2. 认知层次：{bloom_level}
-    3. 每道题包含：题目、选项（如适用）、答案、解析
-    4. 输出JSON格式
-    
-    输出格式：
-    {{
-        "questions": [
-            {{
-                "content": "题目内容",
-                "options": ["选项A", "选项B", "选项C", "选项D"],
-                "answer": 0,
-                "explanation": "详细解析"
-            }}
-        ]
-    }}
-    """
-    
-    @classmethod
-    def get_question_prompt(cls, **kwargs) -> str:
-        """获取题目生成prompt"""
-        return cls.QUESTION_GENERATION.format(**kwargs)
-```
+from typing import AsyncGenerator
+import asyncio
+import json
 
-### 6.2 AI服务封装
-```python
-class AIService:
-    """AI服务封装"""
+class StreamingService:
+    """流式输出服务"""
     
     def __init__(self):
-        self.client = QwenClient()
-        self.cache = RedisCache()
+        self.qwen_client = QwenClient()
+        self.knowledge_service = knowledge_service
     
-    async def generate_with_cache(
-        self,
-        prompt: str,
-        cache_key: str,
-        ttl: int = 3600,
-        **kwargs
-    ) -> str:
-        """带缓存的生成"""
-        # 检查缓存
-        cached = await self.cache.get(cache_key)
-        if cached:
-            return cached
+    async def stream_answer(
+        self, 
+        question: str, 
+        course_id: Optional[int] = None
+    ) -> AsyncGenerator[str, None]:
+        """流式生成答案"""
+        # 1. 搜索相关知识
+        search_results = await self.knowledge_service.search_knowledge(
+            query=question,
+            course_id=course_id,
+            limit=5
+        )
+        
+        # 2. 发送元数据
+        metadata = {
+            "type": "metadata",
+            "sources": [
+                {
+                    "content": result["content"][:200] + "...",
+                    "metadata": result["metadata"],
+                    "relevance_score": result["relevance_score"]
+                }
+                for result in search_results[:3]
+            ]
+        }
+        yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+        
+        # 3. 流式生成回答
+        context = "\n\n".join([r["content"] for r in search_results])
+        prompt = self._build_qa_prompt(question, context)
+        
+        try:
+            stream = self.qwen_client.generate(
+                prompt=prompt,
+                stream=True,
+                temperature=0.7,
+                max_tokens=2000
+            )
             
-        # 生成内容
-        response = await self.client.generate(prompt, **kwargs)
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    data = {
+                        "type": "content",
+                        "content": content
+                    }
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0.001)  # 避免阻塞
+            
+            # 4. 发送完成信号
+            yield f"data: {{\"type\": \"done\"}}\n\n"
+            
+        except Exception as e:
+            error_data = {
+                "type": "error",
+                "error": str(e)
+            }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+```
+
+### 6.2 知识库RAG实现
+```python
+from core.vector_db.simple_chroma_store import SimpleChromaStore
+
+class KnowledgeRAGService:
+    """知识库RAG服务"""
+    
+    def __init__(self):
+        # 使用DashScope嵌入服务
+        self.vector_store = SimpleChromaStore(
+            collection_name="course_knowledge",
+            api_key=settings.dashscope_api_key
+        )
+        self.qwen_client = QwenClient()
+    
+    async def add_document(
+        self,
+        content: str,
+        metadata: Dict[str, Any],
+        document_id: str
+    ):
+        """添加文档到知识库"""
+        await self.vector_store.add_documents(
+            documents=[content],
+            metadatas=[metadata],
+            ids=[document_id]
+        )
+    
+    async def search_and_answer(
+        self,
+        question: str,
+        filter_criteria: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """搜索并生成答案"""
+        # 1. 向量搜索
+        results = await self.vector_store.search(
+            query=question,
+            n_results=5,
+            filter=filter_criteria
+        )
         
-        # 存入缓存
-        await self.cache.set(cache_key, response, ttl=ttl)
+        # 2. 构建上下文
+        context = self._build_context(results)
         
-        return response
+        # 3. 生成答案
+        prompt = f"""
+        基于以下知识库内容回答问题：
+        
+        问题：{question}
+        
+        知识库内容：
+        {context}
+        
+        请给出详细、准确的答案。如果使用了知识库的内容，请在答案末尾标注参考来源。
+        """
+        
+        answer = await self.qwen_client.generate(
+            prompt=prompt,
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        return {
+            "answer": answer,
+            "sources": self._format_sources(results),
+            "confidence": self._calculate_confidence(results)
+        }
 ```
 
 ## 7. 测试开发
@@ -737,6 +819,75 @@ def debug_code():
 3. 运行自动化测试
 4. 检查代码覆盖率
 
+## 12. 最新开发实践
+
+### 12.1 流式输出前端实现
+```typescript
+// 使用React 19的优化渲染
+const streamingMessageRef = useRef<string>("")  // 用ref存储避免闭包问题
+
+for await (const data of streamAskQuestion(question)) {
+  if (data.type === 'content') {
+    streamingMessageRef.current += data.content
+    
+    // 使用requestAnimationFrame优化渲染
+    requestAnimationFrame(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === currentId 
+            ? { ...msg, content: streamingMessageRef.current }
+            : msg
+        )
+      )
+    })
+  }
+}
+```
+
+### 12.2 权限控制最佳实践
+```python
+# 使用装饰器简化权限检查
+from utils.auth import require_role, UserRole
+
+@router.post("/knowledge/batch-delete")
+async def batch_delete_knowledge(
+    ids: dict,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    # 精确权限控制
+    for doc_id in ids["ids"]:
+        document = db.query(KnowledgeDocument).filter(
+            KnowledgeDocument.id == doc_id
+        ).first()
+        
+        if document and document.uploaded_by != current_user.id 
+           and current_user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"您没有权限删除文档 {doc_id}"
+            )
+```
+
+### 12.3 错误处理与降级
+```python
+# 优雅的错误降级机制
+async def ask_question_with_fallback(question: str):
+    try:
+        # 尝试流式输出
+        return StreamingResponse(
+            stream_answer(question),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        logger.warning(f"流式输出失败: {e}, 降级到普通API")
+        
+        # 降级到普通响应
+        answer = await generate_simple_answer(question)
+        return {"answer": answer}
+```
+
 ---
 
-*开发中遇到问题？查看FAQ或在GitHub提Issue*
+**文档维护**: 本文档由 Kisir (kikiboy1120@gmail.com) 维护  
+**开发支持**: 如遇问题，请在 [GitHub Issues](https://github.com/kisir/ai-education-assistant/issues) 提交

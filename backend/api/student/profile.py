@@ -39,13 +39,19 @@ async def get_profile(
     current_user: User = Depends(require_role([UserRole.STUDENT]))
 ):
     """Get current student profile"""
+    # 构建完整的头像URL
+    avatar_url = current_user.avatar_url
+    if avatar_url and avatar_url.startswith("/static/"):
+        base_url = "http://localhost:8000"  # 实际部署时应该从配置中读取
+        avatar_url = f"{base_url}{avatar_url}"
+    
     return ProfileResponse(
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
         full_name=current_user.full_name,
         role=current_user.role.value,
-        avatar_url=current_user.avatar_url,
+        avatar_url=avatar_url,
         created_at=current_user.created_at.isoformat()
     )
 
@@ -143,12 +149,17 @@ async def upload_avatar(
         f.write(contents)
 
     # 更新 user 头像 链接
-    current_user.avatar_url = f"/static/avatars/{filename}"
+    avatar_path = f"/static/avatars/{filename}"
+    current_user.avatar_url = avatar_path
     db.commit()
+    
+    # 返回完整的URL
+    base_url = "http://localhost:8000"  # 实际部署时应该从配置中读取
+    full_avatar_url = f"{base_url}{avatar_path}"
 
     return success_response(
         message="Avatar uploaded successfully",
-        data={"avatar_url": current_user.avatar_url}
+        data={"avatar_url": full_avatar_url}
     )
 
 @router.get("/me/stats")

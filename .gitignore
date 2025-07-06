@@ -1,177 +1,115 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# poetry
-poetry.lock
-
-# pdm
-.pdm.toml
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
 backend_venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Node.js
+node_modules/
+.next/
+out/
+.cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Rope project settings
-.ropeproject
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
 
-# mkdocs documentation
-/site
+# Database
+*.sqlite3
+*.db
+data/
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Uploads
+uploads/
+static/
 
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
+# Logs
+logs/
+*.log
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Project specific
-backend/data/chroma/
-logs/
-uploads/
-*.db
-*.sqlite
-*.sqlite3
-server.log
-nohup.out
-test_output/
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
 
 # Temporary files
-tmp/
-temp/
 *.tmp
 *.temp
-*.bak
-*.backup
+.cache/
 
-# Security
-*.key
-*.pem
-*.cert
-*.crt
+# Project specific
+backend/data/
+backend/uploads/
+backend/static/
+backend/logs/
+backend/*.log
+frontend/.next/
+frontend/out/
 
-# Docker
-docker-compose.override.yml
-.dockerignore
+# Settings
+settings.json
+
+# Image files in root
+*.png
+*.jpg
+*.jpeg
+image.png
+image copy.png
+image copy 2.png
+# 清理脚本添加的忽略项
+# 测试脚本
+*test*.py
+*debug*.py
+reset_*.py
+create_test_*.py
+list_users.py
+verify_*.py
+quick_*.py
+
+# 临时文档
+*_FIXED.md
+*_HIGHLIGHTS.md
+*-test-summary.md
+当前问题*.md
+
+# 临时图片
+*.png
+*.jpg
+!public/*.png
+!public/*.jpg
+!static/avatars/default.jpg
+
+# 配置文件
+settings.json
+
+# Shell脚本（保留必要的）
+monitor.sh
+start_backend.sh
+
+# 清理脚本本身
+cleanup_project.py

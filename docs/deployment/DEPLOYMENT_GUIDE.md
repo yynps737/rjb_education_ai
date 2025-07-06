@@ -1,9 +1,13 @@
-# 部署指南 (Deployment Guide)
+# AI Education Assistant Platform - Deployment Guide
+
+**作者**: Kisir  
+**邮箱**: kikiboy1120@gmail.com  
+**更新日期**: 2025-01-06
 
 ## 1. 部署概述
 
 ### 1.1 部署架构
-本系统支持多种部署方式，推荐使用容器化部署以确保环境一致性和可扩展性。
+本平台支持多种部署方式，推荐使用Docker容器化部署以确保环境一致性和可扩展性。
 
 ### 1.2 系统要求
 - **操作系统**: Ubuntu 20.04+ / CentOS 8+ / Debian 10+
@@ -16,9 +20,10 @@
 - Docker 20.10+
 - Docker Compose 2.0+
 - Python 3.8+
-- PostgreSQL 12+
-- Redis 6+
+- PostgreSQL 15+
+- Redis 7+
 - Nginx 1.20+
+- Node.js 16+ (前端构建)
 
 ## 2. 环境准备
 
@@ -63,8 +68,8 @@ EOF
 
 ### 3.1 克隆项目
 ```bash
-git clone https://github.com/yynps737/rjb_education_ai.git
-cd rjb_education_ai
+git clone https://github.com/kisir/ai-education-assistant.git
+cd ai-education-assistant
 ```
 
 ### 3.2 配置环境变量
@@ -95,8 +100,8 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=<强密码>
 
-# AI服务配置
-DASHSCOPE_API_KEY=<你的API密钥>
+# AI服务配置 (阿里云千问)
+DASHSCOPE_API_KEY=<你的DashScope API密钥>
 
 # 安全配置
 ALLOWED_HOSTS=["yourdomain.com", "www.yourdomain.com"]
@@ -161,10 +166,17 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        # WebSocket支持
+        # SSE流式输出支持
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
+        proxy_set_header X-Accel-Buffering no;
+        
+        # 超时设置
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
     }
 }
 ```
@@ -330,10 +342,10 @@ timeout = 30
 ```
 
 ### 8.2 缓存策略
-- 静态资源CDN加速
-- Redis缓存热点数据
-- 应用层内存缓存
-- 数据库查询缓存
+- **静态资源CDN加速**: 图片、CSS、JS文件
+- **Redis缓存**: 用户会话、热点数据、AI响应缓存
+- **ChromaDB向量缓存**: 知识库嵌入向量
+- **数据库查询缓存**: 频繁查询结果
 
 ## 9. 安全加固
 
@@ -404,6 +416,36 @@ docker-compose down
 docker-compose up -d
 ```
 
+## 12. 特殊配置说明
+
+### 12.1 流式输出配置
+为了支持AI流式输出，需要特别注意：
+
+1. **Nginx配置**: 必须禁用缓冲 (`proxy_buffering off`)
+2. **中间件配置**: 确保不会缓冲SSE响应
+3. **超时设置**: 适当增加超时时间以支持长连接
+
+### 12.2 知识库向量存储
+```bash
+# 创建持久化存储目录
+mkdir -p /data/chroma
+chmod 777 /data/chroma
+
+# Docker挂载配置
+volumes:
+  - /data/chroma:/app/chroma_data
+```
+
+### 12.3 文件上传大小限制
+```nginx
+# Nginx配置
+client_max_body_size 50M;
+
+# FastAPI配置
+MAX_UPLOAD_SIZE=52428800  # 50MB
+```
+
 ---
 
-*部署遇到问题？查看故障排查指南或提交Issue*
+**文档维护**: 本文档由 Kisir (kikiboy1120@gmail.com) 维护  
+**部署支持**: 如遇问题，请在 [GitHub Issues](https://github.com/kisir/ai-education-assistant/issues) 提交

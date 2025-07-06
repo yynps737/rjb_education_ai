@@ -2,6 +2,7 @@
 教师端 - 智能备课API
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Request
+from fastapi.params import Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -9,13 +10,39 @@ import os
 import logging
 from models.database import get_db
 from models.user import User, UserRole
+from models.course import Course
 from utils.auth import require_role
+from utils.response import success_response
 from core.llm.qwen_client import get_qwen_client
 from core.rag.vector_store import VectorStore, RAGEngine
 from core.evaluation.question_generator import QuestionGenerator, QuestionType
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Teacher - Course Design"])
+
+@router.get("/list")
+async def get_teacher_courses(
+    current_user: User = Depends(require_role([UserRole.TEACHER])),
+    db: Session = Depends(get_db)
+):
+    """获取教师的课程列表"""
+    # 查询教师的所有课程
+    courses = db.query(Course).filter(Course.teacher_id == current_user.id).all()
+    
+    # 格式化响应数据
+    course_list = []
+    for course in courses:
+        course_list.append({
+            "id": course.id,
+            "title": course.title,
+            "description": course.description,
+            "subject": course.subject,
+            "grade_level": course.grade_level,
+            "student_count": len(course.users),
+            "created_at": course.created_at.isoformat() if course.created_at else None
+        })
+    
+    return success_response(data=course_list, message="课程列表获取成功")
 
 # 请求响应模型
 class CourseOutlineRequest(BaseModel):

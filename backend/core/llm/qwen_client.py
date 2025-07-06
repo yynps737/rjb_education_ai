@@ -26,7 +26,7 @@ class QwenClient:
         )
         self.model = "qwen-plus"  # 使用千问Plus模型
 
-    def generate(self, prompt: str, max_tokens: int = 2000, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = 2000, temperature: float = 0.7, stream: bool = False):
         """生成文本"""
         try:
             response = self.client.chat.completions.create(
@@ -35,26 +35,42 @@ class QwenClient:
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                stream=stream
             )
-            return response.choices[0].message.content
+            
+            if stream:
+                # 返回生成器用于流式传输
+                return response
+            else:
+                return response.choices[0].message.content
         except Exception as e:
             logger.error(f"千问API调用失败: {e}")
             raise
 
-    def chat(self, messages: List[Dict[str, str]], max_tokens: int = 2000, temperature: float = 0.7) -> str:
+    def chat(self, messages: List[Dict[str, str]], max_tokens: int = 2000, temperature: float = 0.7, stream: bool = False):
         """对话生成"""
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                stream=stream
             )
-            return response.choices[0].message.content
+            
+            if stream:
+                # 返回生成器用于流式传输
+                return response
+            else:
+                return response.choices[0].message.content
         except Exception as e:
             logger.error(f"千问API调用失败: {e}")
             raise
+    
+    def generate_stream(self, prompt: str, max_tokens: int = 2000, temperature: float = 0.7):
+        """流式生成文本 - 便捷方法"""
+        return self.generate(prompt, max_tokens, temperature, stream=True)
 
 
 # 全局实例

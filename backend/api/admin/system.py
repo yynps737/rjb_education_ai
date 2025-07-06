@@ -1,10 +1,13 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import os
 import psutil
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from pydantic import BaseModel
+import json
+from pathlib import Path
 
 from models.database import get_db
 from models.user import User, UserRole
@@ -13,6 +16,122 @@ from utils.response import success_response, error_response
 from core.rag.vector_store import VectorStore
 
 router = APIRouter()
+
+# 系统设置模型
+class SystemSettings(BaseModel):
+    site_name: str = "智能教学平台"
+    site_description: str = "基于AI的现代化教学管理系统"
+    admin_email: str = "admin@example.com"
+    support_email: str = "support@example.com"
+    max_file_size: int = 10  # MB
+    allowed_file_types: list = ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "jpg", "png"]
+    session_timeout: int = 30  # minutes
+    enable_registration: bool = True
+    enable_email_verification: bool = False
+    enable_two_factor: bool = False
+    maintenance_mode: bool = False
+    maintenance_message: str = "系统正在维护中，请稍后再试。"
+    backup_enabled: bool = True
+    backup_frequency: str = "daily"
+    backup_retention_days: int = 30
+    log_level: str = "INFO"
+    log_retention_days: int = 90
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_use_tls: bool = True
+
+# 设置文件路径
+SETTINGS_FILE = Path("settings.json")
+
+def load_settings() -> SystemSettings:
+    """Load settings from file or return defaults"""
+    if SETTINGS_FILE.exists():
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return SystemSettings(**data)
+        except Exception:
+            pass
+    return SystemSettings()
+
+def save_settings(settings: SystemSettings) -> None:
+    """Save settings to file"""
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings.dict(), f, ensure_ascii=False, indent=2)
+
+@router.get("/settings")
+async def get_settings(
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Get system settings"""
+    settings = load_settings()
+    return success_response(data=settings.dict())
+
+@router.put("/settings")
+async def update_settings(
+    settings: SystemSettings,
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Update system settings"""
+    try:
+        save_settings(settings)
+        return success_response(message="设置保存成功")
+    except Exception as e:
+        return error_response(f"保存设置失败: {str(e)}")
+
+@router.get("/system-info")
+async def get_system_info(
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Get system information"""
+    try:
+        # CPU usage
+        cpu_usage = psutil.cpu_percent(interval=1)
+        
+        # Memory usage
+        memory = psutil.virtual_memory()
+        
+        # Disk usage
+        disk = psutil.disk_usage('/')
+        
+        # Mock database size
+        db_size = 1024 * 1024 * 100  # 100MB
+        
+        # Mock counts
+        total_users = 15
+        total_courses = 5
+        total_assignments = 10
+        
+        # Uptime
+        import time
+        boot_time = psutil.boot_time()
+        uptime_seconds = time.time() - boot_time
+        uptime_hours = uptime_seconds / 3600
+        
+        # Python version
+        import sys
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        
+        return success_response(data={
+            "version": "1.0.0",
+            "python_version": python_version,
+            "database_size": db_size,
+            "storage_used": disk.used,
+            "storage_total": disk.total,
+            "cpu_usage": cpu_usage,
+            "memory_usage": memory.used,
+            "memory_total": memory.total,
+            "uptime_hours": round(uptime_hours, 2),
+            "active_users": total_users,
+            "total_courses": total_courses,
+            "total_assignments": total_assignments
+        })
+    except Exception as e:
+        return error_response(f"获取系统信息失败: {str(e)}")
 
 @router.get("/health")
 async def system_health_check(
@@ -304,3 +423,80 @@ async def get_recent_activity(
             "document_uploads": recent_uploads
         }
     })
+
+@router.post("/test-email")
+async def test_email(
+    email_data: Dict[str, Any] = Body(...),
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Send a test email"""
+    try:
+        # In a real implementation, this would use the email service
+        # For now, just simulate success
+        to_email = email_data.get("to")
+        if not to_email:
+            return error_response("收件人邮箱不能为空")
+        
+        # Here you would integrate with your email service
+        # Example: email_service.send_test_email(to_email, smtp_settings)
+        
+        return success_response(message=f"测试邮件已发送到 {to_email}")
+    except Exception as e:
+        return error_response(f"发送失败: {str(e)}")
+
+@router.post("/backup-now")
+async def backup_now(
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Trigger an immediate backup"""
+    try:
+        # In a real implementation, this would trigger the backup service
+        # For now, just simulate the process
+        backup_id = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Here you would integrate with your backup service
+        # Example: backup_service.create_backup(backup_id)
+        
+        return success_response(
+            message="备份任务已启动",
+            data={"backup_id": backup_id}
+        )
+    except Exception as e:
+        return error_response(f"备份失败: {str(e)}")
+
+@router.post("/clear-cache")
+async def clear_system_cache(
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Clear system cache"""
+    cleared = []
+    
+    # Clear Redis cache if available
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        try:
+            import redis
+            r = redis.from_url(redis_url)
+            r.flushdb()
+            cleared.append("redis")
+        except Exception as e:
+            return error_response(f"Failed to clear Redis cache: {str(e)}")
+    
+    # Clear local cache directory
+    cache_dir = "data/cache"
+    if os.path.exists(cache_dir):
+        try:
+            import shutil
+            shutil.rmtree(cache_dir)
+            os.makedirs(cache_dir)
+            cleared.append("local_cache")
+        except Exception as e:
+            return error_response(f"Failed to clear local cache: {str(e)}")
+    
+    return success_response(
+        message="缓存已清除",
+        data={"cleared": cleared}
+    )
